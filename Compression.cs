@@ -114,7 +114,7 @@ namespace Gibbed.RefPack
                 sstart = kposition - 1;
             }
 
-            Debug.Assert(sstart + klength <= kposition);
+            //Debug.Assert(sstart + klength <= kposition);
 
             int limit = klength < 4 ? 0x400 : (klength < 5 ? 0x4000 : 0x20000);
 
