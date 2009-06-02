@@ -40,16 +40,16 @@ namespace Gibbed.RefPack
                 work.WriteU24((UInt32)input.Length, false);
             }
 
-            int aligned = (input.Length >> 2) << 2;
+            int aligned = ((input.Length >> 2) << 2) - 1;
             int position = 0;
 
             while (position < aligned)
             {
-                int block = position < 4 ? 4 : 0;
+                int block = position < 3 ? 3 : 0;
                 int clength = 3;
 
                 int hit = Search(input, position + block, clength, -1);
-                while (hit == -1 && block < 112 && position + block < aligned)
+                while (hit == -1 && block < 112 && position + block + clength < aligned)
                 {
                     block++;
                     hit = Search(input, position + block, clength, -1);
@@ -58,17 +58,21 @@ namespace Gibbed.RefPack
                 int cposition = hit;
                 if (hit != -1)
                 {
-                    while (clength + 1 < 1028 && clength + 1 + cposition < position + block)
+                    while (clength < 1027 && clength < position + block && position + block + clength < aligned)
                     {
                         hit = Search(input, position + block, clength + 1, cposition);
                         if (hit == -1)
                         {
                             break;
                         }
-                        
+
                         clength++;
                         cposition = hit;
                     }
+                }
+                else if (block + clength < 112)
+                {
+                    block += clength;
                 }
 
                 int precomp = block & 3;
@@ -103,11 +107,11 @@ namespace Gibbed.RefPack
         private static int Search(byte[] data, int kposition, int klength, int sstart)
         {
             Debug.Assert(kposition >= klength);
-            Debug.Assert(kposition + klength <= data.Length);
+            Debug.Assert((kposition + klength - 1) <= data.Length);
 
             if (sstart == -1)
             {
-                sstart = kposition - klength;
+                sstart = kposition - 1;
             }
 
             Debug.Assert(sstart + klength <= kposition);
@@ -164,7 +168,7 @@ namespace Gibbed.RefPack
                 int offset = uposition + ulength - cposition - 1;
 
                 Debug.Assert(cposition < uposition + ulength);
-                Debug.Assert(cposition + clength <= uposition + ulength);
+                //Debug.Assert(cposition + clength <= uposition + ulength);
                 Debug.Assert(offset < 0x20000);
                 Debug.Assert(offset + 1 <= uposition + ulength);
                 Debug.Assert(ulength <= 3);
