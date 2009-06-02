@@ -45,6 +45,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ByteHelpers.cs" />
+    <Compile Include="Compression.cs" />
+    <Compile Include="Decompression.cs" />
     <Compile Include="StreamHelpers.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
