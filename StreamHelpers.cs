@@ -1,6 +1,4 @@
-﻿using System;
-using System.IO;
-using Gibbed.Helpers;
+﻿using System.IO;
 
 namespace Gibbed.RefPack
 {
