@@ -16,7 +16,7 @@ namespace Gibbed.RefPack
 
         public static byte[] Decompress(Stream input)
         {
-            UInt16 header = input.ReadU16(false);
+            UInt16 header = input.ReadValueU16(false);
             if ((header & 0x1FFF) != 0x10FB)
             {
                 throw new InvalidOperationException("input is not compressed");
@@ -30,7 +30,7 @@ namespace Gibbed.RefPack
                 throw new InvalidOperationException("this should never happen");
             }
 
-            UInt32 decompressedSize = isLong ? input.ReadU32(false) : input.ReadU24(false);
+            UInt32 decompressedSize = isLong ? input.ReadValueU32(false) : input.ReadValueU24(false);
 
             long baseOffset = input.Position;
             byte[] data = new byte[decompressedSize];
@@ -43,11 +43,11 @@ namespace Gibbed.RefPack
                 UInt32 copySize = 0;
                 UInt32 copyOffset = 0;
 
-                byte prefix = input.ReadU8();
+                byte prefix = input.ReadValueU8();
 
                 if (prefix < 0x80)
                 {
-                    byte extra = input.ReadU8();
+                    byte extra = input.ReadValueU8();
                     
                     plainSize = (UInt32)(prefix & 0x03);
                     copySize = (UInt32)(((prefix & 0x1C) >> 2) + 3);

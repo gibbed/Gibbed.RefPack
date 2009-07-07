@@ -29,15 +29,15 @@ namespace Gibbed.RefPack
             }
 
             MemoryStream work = new MemoryStream();
-            work.WriteU16(header, false);
+            work.WriteValueU16(header, false);
 
             if (input.Length > 0x00FFFFFF)
             {
-                work.WriteU32((UInt32)input.Length, false);
+                work.WriteValueU32((UInt32)input.Length, false);
             }
             else
             {
-                work.WriteU24((UInt32)input.Length, false);
+                work.WriteValueU24((UInt32)input.Length, false);
             }
 
             int aligned = ((input.Length >> 2) << 2) - 1;
@@ -216,7 +216,7 @@ namespace Gibbed.RefPack
                 }
             }
 
-            output.WriteU8(packing);
+            output.WriteValueU8(packing);
 
             if (param != null)
             {
