@@ -338,145 +338,139 @@ namespace Gibbed.RefPack
             return false;
         }
 
-        private static bool FindSequence(byte[] data, int offset, ref int beststart, ref int bestlenth, ref int bestidx, Dictionary<int, List<int>> blocktracking, CompressionLevel level)
+        private static bool FindSequence(byte[] data, int offset, ref int bestStart, ref int bestLength, ref int bestIndex, Dictionary<int, List<int>> blockTracking, CompressionLevel level)
         {
             int start;
             int end = -level.BruteForceLength;
+            
             if (offset < level.BruteForceLength)
+            {
                 end = -offset;
+            }
+
             if (offset > 4)
+            {
                 start = -3;
+            }
             else
+            {
                 start = offset - 3;
-            bool foundrun = false;
+            }
+
+            bool foundRun = false;
             try
             {
-                if (bestlenth < 3)
+                if (bestLength < 3)
                 {
-                    bestlenth = 3;
-                    bestidx = int.MaxValue;
+                    bestLength = 3;
+                    bestIndex = int.MaxValue;
                 }
+
                 byte[] search = new byte[data.Length - offset > 4 ? 4 : data.Length - offset];
+                
                 for (int loop = 0; loop < search.Length; loop++)
                 {
                     search[loop] = data[offset + loop];
                 }
 
-                while (start >= end && bestlenth < 1028)
+                while (start >= end && bestLength < 1028)
                 {
-                    byte curbyte = data[start + offset];
+                    byte currentByte = data[start + offset];
+                    
                     for (int loop = 0; loop < search.Length; loop++)
                     {
-                        if (curbyte != search[loop] || start >= loop || start - loop < -131072)
+                        if (currentByte != search[loop] || start >= loop || start - loop < -131072)
                             continue;
 
                         int len = FindRunLength(data, offset + start, offset + loop);
-                        if ((len > bestlenth || len == bestlenth && loop < bestidx) &&
+
+                        if ((len > bestLength || len == bestLength && loop < bestIndex) &&
                             (len >= 5 ||
                             len >= 4 && start - loop > -16384 ||
                             len >= 3 && start - loop > -1024))
                         {
-                            foundrun = true;
-                            beststart = offset + start;
-                            bestlenth = len;
-                            bestidx = loop;
+                            foundRun = true;
+                            bestStart = offset + start;
+                            bestLength = len;
+                            bestIndex = loop;
                         }
                     }
+
                     start--;
                 }
 
-                if (blocktracking.Count > 0 && data.Length - offset > 16 && bestlenth < 1028)
+                if (blockTracking.Count > 0 && data.Length - offset > 16 && bestLength < 1028)
                 {
                     for (int loop = 0; loop < 4; loop++)
                     {
-                        int thispos = offset + 3 - loop;
+                        int thisPosition = offset + 3 - loop;
                         int adjust = loop > 3 ? loop - 3 : 0;
-                        int value = BitConverter.ToInt32(data, thispos);
+                        int value = BitConverter.ToInt32(data, thisPosition);
                         List<int> positions;
-                        if (blocktracking.TryGetValue(value, out positions))
+                        
+                        if (blockTracking.TryGetValue(value, out positions))
                         {
                             foreach (int trypos in positions)
                             {
                                 int localadjust = adjust;
+                                
                                 if (trypos + 131072 < offset + 8)
                                 {
                                     continue;
                                 }
-                                int len = FindRunLength(data, trypos + localadjust, thispos + localadjust);
-                                if (len >= 5 && len > bestlenth)
+                                
+                                int length = FindRunLength(data, trypos + localadjust, thisPosition + localadjust);
+                                
+                                if (length >= 5 && length > bestLength)
                                 {
-                                    foundrun = true;
-                                    beststart = trypos + localadjust;
-                                    bestlenth = len;
+                                    foundRun = true;
+                                    bestStart = trypos + localadjust;
+                                    bestLength = length;
                                     if (loop < 3)
-                                        bestidx = 3 - loop;
+                                    {
+                                        bestIndex = 3 - loop;
+                                    }
                                     else
-                                        bestidx = 0;
+                                    {
+                                        bestIndex = 0;
+                                    }
                                 }
-                                if (bestlenth > 1028)
+
+                                if (bestLength > 1028)
+                                {
                                     break;
+                                }
                             }
                         }
-                        if (bestlenth > 1028)
+
+                        if (bestLength > 1028)
+                        {
                             break;
+                        }
                     }
                 }
             }
+
             catch (Exception ex)
             {
                 throw new Exception(ex.Message, ex);
             }
 
-            return foundrun;
+            return foundRun;
         }
 
-        static private int FindRunLength(byte[] data, int src, int dst)
+        static private int FindRunLength(byte[] data, int source, int destination)
         {
-            int endsrc = src + 1;
-            int enddst = dst + 1;
-            while (enddst < data.Length && data[endsrc] == data[enddst] && enddst - dst < 1028)
+            int endSource = source + 1;
+            int endDestination = destination + 1;
+
+            while (endDestination < data.Length && data[endSource] == data[endDestination] && endDestination - destination < 1028)
             {
-                endsrc++;
-                enddst++;
+                endSource++;
+                endDestination++;
             }
 
-            return enddst - dst;
-        }
-
-        static public bool NonCompress(byte[] data, out byte[] compressed)
-        {
-            int i = 1;
-            while (i == 0)
-                ;
-            compressed = new byte[data.Length + (data.Length + 124) / 128 + 6 + ((data.Length & 3) > 0 ? (data.Length & 3) + 1 : 0)];
-            compressed[0] = 0x10;
-            compressed[1] = 0xfb;
-            compressed[2] = (byte)(data.Length >> 16);
-            compressed[3] = (byte)(data.Length >> 8);
-            compressed[4] = (byte)data.Length;
-            compressed[compressed.Length - 1] = 0xfc;
-
-            for (int loop = 0; loop < data.Length / 128; loop++)
-            {
-                compressed[loop + loop / 128 + 5] = 0xFB;
-                Array.Copy(data, loop, compressed, loop + loop / 128 + 6, data.Length - loop > 128 ? 128 : data.Length - loop);
-            }
-
-            if (data.Length % 128 > 0)
-            {
-                if (data.Length % 128 > 3)
-                {
-                    compressed[(data.Length & ~127) + data.Length / 128 + 5] = (byte)(0xE0 | ((data.Length % 128) / 4 - 1));
-                    Array.Copy(data, data.Length & ~127, compressed, (data.Length & ~127) + data.Length / 128 + 6, (data.Length % 128) & ~3);
-                }
-                if ((data.Length & 3) > 0)
-                {
-                    compressed[compressed.Length - 2 - (data.Length & 3)] = (byte)(0xFC | (data.Length & 3));
-                    Array.Copy(data, data.Length & ~3, compressed, compressed.Length - 1 - (data.Length & 3), data.Length & 3);
-                }
-            }
-
-            return true;
+            return endDestination - destination;
         }
     }
 }
