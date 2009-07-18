@@ -459,7 +459,7 @@ namespace Gibbed.RefPack
             return foundRun;
         }
 
-        static private int FindRunLength(byte[] data, int source, int destination)
+        private static int FindRunLength(byte[] data, int source, int destination)
         {
             int endSource = source + 1;
             int endDestination = destination + 1;
