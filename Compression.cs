@@ -1,8 +1,27 @@
-﻿using System;
+﻿/* Copyright (c) 2013 Rick (rick 'at' gibbed 'dot' us)
+ * 
+ * This software is provided 'as-is', without any express or implied
+ * warranty. In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ * 
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ * 
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would
+ *    be appreciated but is not required.
+ * 
+ * 2. Altered source versions must be plainly marked as such, and must not
+ *    be misrepresented as being the original software.
+ * 
+ * 3. This notice may not be removed or altered from any source
+ *    distribution.
+ */
+
+using System;
 using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using Gibbed.Helpers;
 
 namespace Gibbed.RefPack
 {
@@ -17,7 +36,12 @@ namespace Gibbed.RefPack
         public readonly int SameValToTrack;
         public readonly int BruteForceLength;
 
-        public CompressionLevel(int blockInterval, int searchLength, int prequeueLength, int queueLength, int sameValToTrack, int bruteForceLength)
+        public CompressionLevel(int blockInterval,
+                                int searchLength,
+                                int prequeueLength,
+                                int queueLength,
+                                int sameValToTrack,
+                                int bruteForceLength)
         {
             this.BlockInterval = blockInterval;
             this.SearchLength = searchLength;
@@ -52,10 +76,10 @@ namespace Gibbed.RefPack
                 throw new InvalidOperationException("input data is too large");
             }
 
-            bool endIsValid = false;
-            List<byte[]> compressedChunks = new List<byte[]>();
-            int compressedIndex = 0;
-            int compressedLength = 0;
+            var endIsValid = false;
+            var compressedChunks = new List<byte[]>();
+            var compressedIndex = 0;
+            var compressedLength = 0;
             output = null;
 
             if (input.Length < 16)
@@ -63,13 +87,13 @@ namespace Gibbed.RefPack
                 return false;
             }
 
-            Queue<KeyValuePair<int, int>> blockTrackingQueue = new Queue<KeyValuePair<int, int>>();
-            Queue<KeyValuePair<int, int>> blockPretrackingQueue = new Queue<KeyValuePair<int, int>>();
-            
+            var blockTrackingQueue = new Queue<KeyValuePair<int, int>>();
+            var blockPretrackingQueue = new Queue<KeyValuePair<int, int>>();
+
             // So lists aren't being freed and allocated so much
-            Queue<List<int>> unusedLists = new Queue<List<int>>();
-            Dictionary<int, List<int>> latestBlocks = new Dictionary<int, List<int>>();
-            int lastBlockStored = 0;
+            var unusedLists = new Queue<List<int>>();
+            var latestBlocks = new Dictionary<int, List<int>>();
+            var lastBlockStored = 0;
 
             while (compressedIndex < input.Length)
             {
@@ -77,29 +101,21 @@ namespace Gibbed.RefPack
                 {
                     if (blockPretrackingQueue.Count >= level.PrequeueLength)
                     {
-                        KeyValuePair<int, int> tmppair = blockPretrackingQueue.Dequeue();
+                        var tmppair = blockPretrackingQueue.Dequeue();
                         blockTrackingQueue.Enqueue(tmppair);
-                        
-                        List<int> valueList;
-                        
-                        if (!latestBlocks.TryGetValue(tmppair.Key, out valueList))
-                        {
-                            if (unusedLists.Count > 0)
-                            {
-                                valueList = unusedLists.Dequeue();
-                            }
-                            else
-                            {
-                                valueList = new List<int>();
-                            }
 
+                        List<int> valueList;
+
+                        if (latestBlocks.TryGetValue(tmppair.Key, out valueList) == false)
+                        {
+                            valueList = unusedLists.Count > 0 ? unusedLists.Dequeue() : new List<int>();
                             latestBlocks[tmppair.Key] = valueList;
                         }
 
                         if (valueList.Count >= level.SameValToTrack)
                         {
-                            int earliestIndex = 0;
-                            int earliestValue = valueList[0];
+                            var earliestIndex = 0;
+                            var earliestValue = valueList[0];
 
                             for (int loop = 1; loop < valueList.Count; loop++)
                             {
@@ -119,9 +135,9 @@ namespace Gibbed.RefPack
 
                         if (blockTrackingQueue.Count > level.QueueLength)
                         {
-                            KeyValuePair<int, int> tmppair2 = blockTrackingQueue.Dequeue();
+                            var tmppair2 = blockTrackingQueue.Dequeue();
                             valueList = latestBlocks[tmppair2.Key];
-                            
+
                             for (int loop = 0; loop < valueList.Count; loop++)
                             {
                                 if (valueList[loop] == tmppair2.Value)
@@ -139,7 +155,8 @@ namespace Gibbed.RefPack
                         }
                     }
 
-                    KeyValuePair<int, int> newBlock = new KeyValuePair<int, int>(BitConverter.ToInt32(input, lastBlockStored), lastBlockStored);
+                    var newBlock = new KeyValuePair<int, int>(BitConverter.ToInt32(input, lastBlockStored),
+                                                              lastBlockStored);
                     lastBlockStored += level.BlockInterval;
                     blockPretrackingQueue.Enqueue(newBlock);
                 }
@@ -147,14 +164,14 @@ namespace Gibbed.RefPack
                 if (input.Length - compressedIndex < 4)
                 {
                     // Just copy the rest
-                    byte[] chunk = new byte[input.Length - compressedIndex + 1];
+                    var chunk = new byte[input.Length - compressedIndex + 1];
                     chunk[0] = (byte)(0xFC | (input.Length - compressedIndex));
                     Array.Copy(input, compressedIndex, chunk, 1, input.Length - compressedIndex);
-                    
+
                     compressedChunks.Add(chunk);
                     compressedIndex += chunk.Length - 1;
                     compressedLength += chunk.Length;
-                    
+
                     // int toRead = 0;
                     // int toCopy2 = 0;
                     // int copyOffset = 0;
@@ -164,21 +181,35 @@ namespace Gibbed.RefPack
                 }
 
                 // Search ahead the next 3 bytes for the "best" sequence to copy
-                int sequenceStart = 0;
-                int sequenceLength = 0;
-                int sequenceIndex = 0;
-                bool isSequence = false;
+                var sequenceStart = 0;
+                var sequenceLength = 0;
+                var sequenceIndex = 0;
+                var isSequence = false;
 
-                if (FindSequence(input, compressedIndex, ref sequenceStart, ref sequenceLength, ref sequenceIndex, latestBlocks, level))
+                if (FindSequence(input,
+                                 compressedIndex,
+                                 ref sequenceStart,
+                                 ref sequenceLength,
+                                 ref sequenceIndex,
+                                 latestBlocks,
+                                 level))
                 {
                     isSequence = true;
                 }
                 else
                 {
                     // Find the next sequence
-                    for (int loop = compressedIndex + 4; !isSequence && loop + 3 < input.Length; loop += 4)
+                    for (int loop = compressedIndex + 4;
+                         isSequence == false && loop + 3 < input.Length;
+                         loop += 4)
                     {
-                        if (FindSequence(input, loop, ref sequenceStart, ref sequenceLength, ref sequenceIndex, latestBlocks, level))
+                        if (FindSequence(input,
+                                         loop,
+                                         ref sequenceStart,
+                                         ref sequenceLength,
+                                         ref sequenceIndex,
+                                         latestBlocks,
+                                         level))
                         {
                             sequenceIndex += loop - compressedIndex;
                             isSequence = true;
@@ -199,7 +230,7 @@ namespace Gibbed.RefPack
                             toCopy = 112;
                         }
 
-                        byte[] chunk = new byte[toCopy + 1];
+                        var chunk = new byte[toCopy + 1];
                         chunk[0] = (byte)(0xE0 | ((toCopy >> 2) - 1));
                         Array.Copy(input, compressedIndex, chunk, 1, toCopy);
                         compressedChunks.Add(chunk);
@@ -215,7 +246,6 @@ namespace Gibbed.RefPack
 
                 if (isSequence)
                 {
-                    byte[] chunk = null;
                     /*
                      * 00-7F  0oocccpp oooooooo
                      *   Read 0-3
@@ -254,10 +284,13 @@ namespace Gibbed.RefPack
                         sequenceLength -= thisLength;
                         int offset = compressedIndex - sequenceStart + sequenceIndex - 1;
 
+                        byte[] chunk;
                         if (thisLength > 67 || offset > 16383)
                         {
                             chunk = new byte[sequenceIndex + 4];
-                            chunk[0] = (byte)(0xC0 | sequenceIndex | (((thisLength - 5) >> 6) & 0x0C) | ((offset >> 12) & 0x10));
+                            chunk[0] =
+                                (byte)
+                                (0xC0 | sequenceIndex | (((thisLength - 5) >> 6) & 0x0C) | ((offset >> 12) & 0x10));
                             chunk[1] = (byte)((offset >> 8) & 0xFF);
                             chunk[2] = (byte)(offset & 0xFF);
                             chunk[3] = (byte)((thisLength - 5) & 0xFF);
@@ -272,7 +305,9 @@ namespace Gibbed.RefPack
                         else
                         {
                             chunk = new byte[sequenceIndex + 2];
-                            chunk[0] = (byte)((sequenceIndex & 0x3) | (((thisLength - 3) << 2) & 0x1C) | ((offset >> 3) & 0x60));
+                            chunk[0] =
+                                (byte)
+                                ((sequenceIndex & 0x3) | (((thisLength - 3) << 2) & 0x1C) | ((offset >> 3) & 0x60));
                             chunk[1] = (byte)(offset & 0xFF);
                         }
 
@@ -321,10 +356,10 @@ namespace Gibbed.RefPack
                     chunkPosition = 5;
                 }
 
-                for (int loop = 0; loop < compressedChunks.Count; loop++)
+                foreach (byte[] t in compressedChunks)
                 {
-                    Array.Copy(compressedChunks[loop], 0, output, chunkPosition, compressedChunks[loop].Length);
-                    chunkPosition += compressedChunks[loop].Length;
+                    Array.Copy(t, 0, output, chunkPosition, t.Length);
+                    chunkPosition += t.Length;
                 }
 
                 if (!endIsValid)
@@ -338,11 +373,17 @@ namespace Gibbed.RefPack
             return false;
         }
 
-        private static bool FindSequence(byte[] data, int offset, ref int bestStart, ref int bestLength, ref int bestIndex, Dictionary<int, List<int>> blockTracking, CompressionLevel level)
+        private static bool FindSequence(byte[] data,
+                                         int offset,
+                                         ref int bestStart,
+                                         ref int bestLength,
+                                         ref int bestIndex,
+                                         Dictionary<int, List<int>> blockTracking,
+                                         CompressionLevel level)
         {
             int start;
             int end = -level.BruteForceLength;
-            
+
             if (offset < level.BruteForceLength)
             {
                 end = -offset;
@@ -358,102 +399,96 @@ namespace Gibbed.RefPack
             }
 
             bool foundRun = false;
-            try
+            if (bestLength < 3)
             {
-                if (bestLength < 3)
-                {
-                    bestLength = 3;
-                    bestIndex = int.MaxValue;
-                }
-
-                byte[] search = new byte[data.Length - offset > 4 ? 4 : data.Length - offset];
-                
-                for (int loop = 0; loop < search.Length; loop++)
-                {
-                    search[loop] = data[offset + loop];
-                }
-
-                while (start >= end && bestLength < 1028)
-                {
-                    byte currentByte = data[start + offset];
-                    
-                    for (int loop = 0; loop < search.Length; loop++)
-                    {
-                        if (currentByte != search[loop] || start >= loop || start - loop < -131072)
-                            continue;
-
-                        int len = FindRunLength(data, offset + start, offset + loop);
-
-                        if ((len > bestLength || len == bestLength && loop < bestIndex) &&
-                            (len >= 5 ||
-                            len >= 4 && start - loop > -16384 ||
-                            len >= 3 && start - loop > -1024))
-                        {
-                            foundRun = true;
-                            bestStart = offset + start;
-                            bestLength = len;
-                            bestIndex = loop;
-                        }
-                    }
-
-                    start--;
-                }
-
-                if (blockTracking.Count > 0 && data.Length - offset > 16 && bestLength < 1028)
-                {
-                    for (int loop = 0; loop < 4; loop++)
-                    {
-                        int thisPosition = offset + 3 - loop;
-                        int adjust = loop > 3 ? loop - 3 : 0;
-                        int value = BitConverter.ToInt32(data, thisPosition);
-                        List<int> positions;
-                        
-                        if (blockTracking.TryGetValue(value, out positions))
-                        {
-                            foreach (int trypos in positions)
-                            {
-                                int localadjust = adjust;
-                                
-                                if (trypos + 131072 < offset + 8)
-                                {
-                                    continue;
-                                }
-                                
-                                int length = FindRunLength(data, trypos + localadjust, thisPosition + localadjust);
-                                
-                                if (length >= 5 && length > bestLength)
-                                {
-                                    foundRun = true;
-                                    bestStart = trypos + localadjust;
-                                    bestLength = length;
-                                    if (loop < 3)
-                                    {
-                                        bestIndex = 3 - loop;
-                                    }
-                                    else
-                                    {
-                                        bestIndex = 0;
-                                    }
-                                }
-
-                                if (bestLength > 1028)
-                                {
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (bestLength > 1028)
-                        {
-                            break;
-                        }
-                    }
-                }
+                bestLength = 3;
+                bestIndex = int.MaxValue;
             }
 
-            catch (Exception ex)
+            var search = new byte[data.Length - offset > 4 ? 4 : data.Length - offset];
+
+            for (int loop = 0; loop < search.Length; loop++)
             {
-                throw new Exception(ex.Message, ex);
+                search[loop] = data[offset + loop];
+            }
+
+            while (start >= end && bestLength < 1028)
+            {
+                byte currentByte = data[start + offset];
+
+                for (int loop = 0; loop < search.Length; loop++)
+                {
+                    if (currentByte != search[loop] || start >= loop || start - loop < -131072)
+                    {
+                        continue;
+                    }
+
+                    int len = FindRunLength(data, offset + start, offset + loop);
+
+                    if ((len > bestLength || len == bestLength && loop < bestIndex) &&
+                        (len >= 5 ||
+                         len >= 4 && start - loop > -16384 ||
+                         len >= 3 && start - loop > -1024))
+                    {
+                        foundRun = true;
+                        bestStart = offset + start;
+                        bestLength = len;
+                        bestIndex = loop;
+                    }
+                }
+
+                start--;
+            }
+
+            if (blockTracking.Count > 0 && data.Length - offset > 16 && bestLength < 1028)
+            {
+                for (int loop = 0; loop < 4; loop++)
+                {
+                    var thisPosition = offset + 3 - loop;
+                    var adjust = loop > 3 ? loop - 3 : 0;
+                    var value = BitConverter.ToInt32(data, thisPosition);
+                    List<int> positions;
+
+                    if (blockTracking.TryGetValue(value, out positions))
+                    {
+                        foreach (var trypos in positions)
+                        {
+                            int localadjust = adjust;
+
+                            if (trypos + 131072 < offset + 8)
+                            {
+                                continue;
+                            }
+
+                            int length = FindRunLength(data, trypos + localadjust, thisPosition + localadjust);
+
+                            if (length >= 5 && length > bestLength)
+                            {
+                                foundRun = true;
+                                bestStart = trypos + localadjust;
+                                bestLength = length;
+                                if (loop < 3)
+                                {
+                                    bestIndex = 3 - loop;
+                                }
+                                else
+                                {
+                                    bestIndex = 0;
+                                }
+                            }
+
+                            if (bestLength > 1028)
+                            {
+                                break;
+                            }
+                        }
+                    }
+
+                    if (bestLength > 1028)
+                    {
+                        break;
+                    }
+                }
             }
 
             return foundRun;
@@ -464,7 +499,8 @@ namespace Gibbed.RefPack
             int endSource = source + 1;
             int endDestination = destination + 1;
 
-            while (endDestination < data.Length && data[endSource] == data[endDestination] && endDestination - destination < 1028)
+            while (endDestination < data.Length && data[endSource] == data[endDestination] &&
+                   endDestination - destination < 1028)
             {
                 endSource++;
                 endDestination++;

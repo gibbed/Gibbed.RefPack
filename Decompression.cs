@@ -1,6 +1,28 @@
-﻿using System;
+﻿/* Copyright (c) 2013 Rick (rick 'at' gibbed 'dot' us)
+ * 
+ * This software is provided 'as-is', without any express or implied
+ * warranty. In no event will the authors be held liable for any damages
+ * arising from the use of this software.
+ * 
+ * Permission is granted to anyone to use this software for any purpose,
+ * including commercial applications, and to alter it and redistribute it
+ * freely, subject to the following restrictions:
+ * 
+ * 1. The origin of this software must not be misrepresented; you must not
+ *    claim that you wrote the original software. If you use this software
+ *    in a product, an acknowledgment in the product documentation would
+ *    be appreciated but is not required.
+ * 
+ * 2. Altered source versions must be plainly marked as such, and must not
+ *    be misrepresented as being the original software.
+ * 
+ * 3. This notice may not be removed or altered from any source
+ *    distribution.
+ */
+
+using System;
 using System.IO;
-using Gibbed.Helpers;
+using Gibbed.IO;
 
 namespace Gibbed.RefPack
 {
@@ -8,54 +30,54 @@ namespace Gibbed.RefPack
     {
         public static byte[] Decompress(byte[] input)
         {
-            MemoryStream data = new MemoryStream();
-            data.Write(input, 0, input.Length);
-            data.Seek(0, SeekOrigin.Begin);
-            return data.RefPackDecompress();
+            using (var data = new MemoryStream())
+            {
+                data.Write(input, 0, input.Length);
+                data.Seek(0, SeekOrigin.Begin);
+                return data.RefPackDecompress();
+            }
         }
 
         public static byte[] Decompress(Stream input)
         {
-            UInt16 header = input.ReadValueU16(false);
+            var header = input.ReadValueU16(Endian.Big);
             if ((header & 0x1FFF) != 0x10FB)
             {
                 throw new InvalidOperationException("input is not compressed");
             }
 
-            bool isLong = (header & 0x8000) == 0x8000;
-            bool isDoubled = (header & 0x0100) == 0x0100;
+            var isLong = (header & 0x8000) != 0;
+            var isDoubled = (header & 0x0100) != 0;
 
             if (isDoubled == true)
             {
                 throw new InvalidOperationException("this should never happen");
             }
 
-            UInt32 decompressedSize = isLong ? input.ReadValueU32(false) : input.ReadValueU24(false);
+            uint decompressedSize = isLong ? input.ReadValueU32(Endian.Big) : input.ReadValueU24();
 
-            long baseOffset = input.Position;
-            byte[] data = new byte[decompressedSize];
+            var data = new byte[decompressedSize];
             uint offset = 0;
 
             while (true)
             {
                 bool stop = false;
-                UInt32 plainSize = 0;
-                UInt32 copySize = 0;
-                UInt32 copyOffset = 0;
+                uint plainSize;
+                var copySize = 0u;
+                var copyOffset = 0u;
 
                 byte prefix = input.ReadValueU8();
-
                 if (prefix < 0x80)
                 {
-                    byte extra = input.ReadValueU8();
-                    
+                    var extra = input.ReadValueU8();
+
                     plainSize = (UInt32)(prefix & 0x03);
                     copySize = (UInt32)(((prefix & 0x1C) >> 2) + 3);
                     copyOffset = (UInt32)((((prefix & 0x60) << 3) | extra) + 1);
                 }
                 else if (prefix < 0xC0)
                 {
-                    byte[] extra = new byte[2];
+                    var extra = new byte[2];
                     input.Read(extra, 0, extra.Length);
 
                     plainSize = (uint)(extra[0] >> 6);
@@ -64,7 +86,7 @@ namespace Gibbed.RefPack
                 }
                 else if (prefix < 0xE0)
                 {
-                    byte[] extra = new byte[3];
+                    var extra = new byte[3];
                     input.Read(extra, 0, extra.Length);
 
                     plainSize = (uint)(prefix & 3);

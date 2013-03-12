@@ -1,6 +1,6 @@
 ﻿namespace Gibbed.RefPack
 {
-    public static partial class ByteHelpers
+    public static class ByteHelpers
     {
         public static bool RefPackCompress(this byte[] input, out byte[] output, CompressionLevel level)
         {
