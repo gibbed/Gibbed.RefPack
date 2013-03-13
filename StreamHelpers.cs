@@ -20,8 +20,6 @@
  *    distribution.
  */
 
-using System;
-using System.Diagnostics;
 using System.IO;
 
 namespace Gibbed.RefPack
@@ -45,21 +43,6 @@ namespace Gibbed.RefPack
         public static byte[] RefPackDecompress(this Stream input)
         {
             return Decompression.Decompress(input);
-        }
-
-        internal static UInt32 ReadValueU24(this Stream stream)
-        {
-            var data = new byte[4];
-            int read = stream.Read(data, 0, 3);
-            Debug.Assert(read == 3);
-            return BitConverter.ToUInt32(data, 0) & 0xFFFFFF;
-        }
-
-        internal static void WriteValueU24(this Stream stream, UInt32 value)
-        {
-            var data = BitConverter.GetBytes(value & 0xFFFFFF);
-            Debug.Assert(data.Length == 4);
-            stream.Write(data, 0, 3);
         }
     }
 }

@@ -22,7 +22,6 @@
 
 using System;
 using System.IO;
-using Gibbed.IO;
 
 namespace Gibbed.RefPack
 {
@@ -30,17 +29,21 @@ namespace Gibbed.RefPack
     {
         public static byte[] Decompress(byte[] input)
         {
-            using (var data = new MemoryStream())
+            using (var data = new MemoryStream(input, false))
             {
-                data.Write(input, 0, input.Length);
-                data.Seek(0, SeekOrigin.Begin);
                 return data.RefPackDecompress();
             }
         }
 
         public static byte[] Decompress(Stream input)
         {
-            var header = input.ReadValueU16(Endian.Big);
+            var dummy = new byte[4];
+            if (input.Read(dummy, 0, 2) != 2)
+            {
+                throw new EndOfStreamException("could not read header");
+            }
+
+            var header = (dummy[0] << 8) | dummy[1];
             if ((header & 0x1FFF) != 0x10FB)
             {
                 throw new InvalidOperationException("input is not compressed");
@@ -54,11 +57,31 @@ namespace Gibbed.RefPack
                 throw new InvalidOperationException("this should never happen");
             }
 
-            uint decompressedSize = isLong ? input.ReadValueU32(Endian.Big) : input.ReadValueU24();
+            uint uncompressedSize;
+            if (isLong == true)
+            {
+                if (input.Read(dummy, 0, 4) != 4)
+                {
+                    throw new EndOfStreamException("could not read uncompressed size");
+                }
+                uncompressedSize = (uint)(dummy[0] << 24) |
+                                   (uint)(dummy[1] << 16) |
+                                   (uint)(dummy[2] << 8) |
+                                   (uint)(dummy[3] << 0);
+            }
+            else
+            {
+                if (input.Read(dummy, 0, 3) != 3)
+                {
+                    throw new EndOfStreamException("could not read uncompressed size");
+                }
+                uncompressedSize = (uint)(dummy[0] << 16) |
+                                   (uint)(dummy[1] << 8) |
+                                   (uint)(dummy[2] << 0);
+            }
 
-            var data = new byte[decompressedSize];
+            var data = new byte[uncompressedSize];
             uint offset = 0;
-
             while (true)
             {
                 bool stop = false;
@@ -66,32 +89,44 @@ namespace Gibbed.RefPack
                 var copySize = 0u;
                 var copyOffset = 0u;
 
-                byte prefix = input.ReadValueU8();
+                if (input.Read(dummy, 0, 1) != 1)
+                {
+                    throw new EndOfStreamException("could not read prefix");
+                }
+                var prefix = dummy[0];
+
                 if (prefix < 0x80)
                 {
-                    var extra = input.ReadValueU8();
+                    if (input.Read(dummy, 0, 1) != 1)
+                    {
+                        throw new EndOfStreamException("could not read extra");
+                    }
 
                     plainSize = (UInt32)(prefix & 0x03);
                     copySize = (UInt32)(((prefix & 0x1C) >> 2) + 3);
-                    copyOffset = (UInt32)((((prefix & 0x60) << 3) | extra) + 1);
+                    copyOffset = (UInt32)((((prefix & 0x60) << 3) | dummy[0]) + 1);
                 }
                 else if (prefix < 0xC0)
                 {
-                    var extra = new byte[2];
-                    input.Read(extra, 0, extra.Length);
+                    if (input.Read(dummy, 0, 2) != 2)
+                    {
+                        throw new EndOfStreamException("could not read extra");
+                    }
 
-                    plainSize = (uint)(extra[0] >> 6);
+                    plainSize = (uint)(dummy[0] >> 6);
                     copySize = (uint)((prefix & 0x3F) + 4);
-                    copyOffset = (uint)((((extra[0] & 0x3F) << 8) | extra[1]) + 1);
+                    copyOffset = (uint)((((dummy[0] & 0x3F) << 8) | dummy[1]) + 1);
                 }
                 else if (prefix < 0xE0)
                 {
-                    var extra = new byte[3];
-                    input.Read(extra, 0, extra.Length);
+                    if (input.Read(dummy, 0, 3) != 3)
+                    {
+                        throw new EndOfStreamException("could not read extra");
+                    }
 
                     plainSize = (uint)(prefix & 3);
-                    copySize = (uint)((((prefix & 0x0C) << 6) | extra[2]) + 5);
-                    copyOffset = (uint)((((((prefix & 0x10) << 4) | extra[0]) << 8) | extra[1]) + 1);
+                    copySize = (uint)((((prefix & 0x0C) << 6) | dummy[2]) + 5);
+                    copyOffset = (uint)((((((prefix & 0x10) << 4) | dummy[0]) << 8) | dummy[1]) + 1);
                 }
                 else if (prefix < 0xFC)
                 {
@@ -105,7 +140,11 @@ namespace Gibbed.RefPack
 
                 if (plainSize > 0)
                 {
-                    input.Read(data, (int)offset, (int)plainSize);
+                    if (input.Read(data, (int)offset, (int)plainSize) != (int)plainSize)
+                    {
+                        throw new EndOfStreamException("could not read plain");
+                    }
+
                     offset += plainSize;
                 }
 
