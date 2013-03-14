@@ -29,14 +29,20 @@ namespace Gibbed.RefPack
         public static bool RefPackCompress(this Stream input, int length, out byte[] output, CompressionLevel level)
         {
             var data = new byte[length];
-            input.Read(data, 0, data.Length);
+            if (input.Read(data, 0, data.Length) != data.Length)
+            {
+                throw new EndOfStreamException();
+            }
             return Compression.Compress(data, out output, level);
         }
 
         public static bool RefPackCompress(this Stream input, int length, out byte[] output)
         {
             var data = new byte[length];
-            input.Read(data, 0, data.Length);
+            if (input.Read(data, 0, data.Length) != data.Length)
+            {
+                throw new EndOfStreamException();
+            }
             return Compression.Compress(data, out output, CompressionLevel.Max);
         }
 
